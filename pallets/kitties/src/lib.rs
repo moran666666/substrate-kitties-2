@@ -174,7 +174,7 @@ pub mod pallet {
 				Err(())
 			}).map_err(|_| <Error<T>>::NotOwner)?;
 			
-			// 解押原来拥有都质押的token
+			// 解押原来拥有者质押的token
 			T::Currency::unreserve(&prev_owner, T::KittyReserve::get());
 
 			<KittyOwner<T>>::insert(kitty_id, &new_owner);

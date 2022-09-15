@@ -54,6 +54,10 @@ impl system::Config for Test {
 impl pallet_kitties::Config for Test {
 	type Event = Event;
 	type Randomness = Randomness;
+	type KittyIndex = u32;
+	// type KittyReserve;
+	// type Currency = pallet_balances::Pallet<runtime>;
+	type MaxLength = frame_support::traits::ConstU32<64>;
 }
 
 impl pallet_randomness_collective_flip::Config for Test {
