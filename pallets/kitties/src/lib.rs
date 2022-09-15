@@ -16,15 +16,6 @@ pub mod pallet {
 	use frame_support::traits::{Randomness, Currency, ReservableCurrency};
 	use sp_runtime::traits::{AtLeast32BitUnsigned, Bounded, One};
 
-	// 移动到runtime里实现
-	// type KittyIndex = Config::KittyIndex;
-
-	// KittyIndex移动到runtime里实现，此函数取消
-	// #[pallet::type_value]
-	// pub fn GetDefaultValue() -> KittyIndex {
-	// 	0_u32
-	// }
-
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 	pub struct Kitty(pub [u8; 16]);
 
@@ -85,7 +76,6 @@ pub mod pallet {
 		NotOwner,
 		SameKittyId,
 		TokenNotEnough,
-		ExceedMaxKittyOwned,
 	}
 
 	#[pallet::call]
@@ -93,7 +83,7 @@ pub mod pallet {
 		#[pallet::weight(10_000)]
 		pub fn create(origin: OriginFor<T>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			let kitty_id = Self::get_next_id().map_err(|_| Error::<T>::InvalidKittyId)?;
+			let kitty_id = Self::get_next_id().map_err(|_| Error::<T>::KittiesCountOverflow)?;
 
 			// 创建新的kitty需要质押token
 			T::Currency::reserve(&who, T::KittyReserve::get()).map_err(|_| Error::<T>::TokenNotEnough)?;
@@ -108,7 +98,7 @@ pub mod pallet {
 			// 创建kitty时，需要增加到扩展存储项中
 			AllOwnerKitty::<T>::try_mutate(&who, |kitty_vec| {
 				kitty_vec.try_push(kitty.clone())
-			}).map_err(|_| <Error<T>>::ExceedMaxKittyOwned)?;
+			}).map_err(|_| <Error<T>>::KittiesCountOverflow)?;
 
 			// Emit an event.
 			Self::deposit_event(Event::KittyCreated(who, kitty_id, kitty));
@@ -119,16 +109,16 @@ pub mod pallet {
 		pub fn breed(origin: OriginFor<T>, kitty_id_1: T::KittyIndex, kitty_id_2: T::KittyIndex) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			// 繁殖kitty需要质押token
-			T::Currency::reserve(&who, T::KittyReserve::get()).map_err(|_| Error::<T>::TokenNotEnough)?;
-
 			// check kitty id
 			ensure!(kitty_id_1 != kitty_id_2, Error::<T>::SameKittyId);
 			let kitty_1 = Self::get_kitty(kitty_id_1).map_err(|_| Error::<T>::InvalidKittyId)?;
 			let kitty_2 = Self::get_kitty(kitty_id_2).map_err(|_| Error::<T>::InvalidKittyId)?;
 
 			// get next id
-			let kitty_id = Self::get_next_id().map_err(|_| Error::<T>::InvalidKittyId)?;
+			let kitty_id = Self::get_next_id().map_err(|_| Error::<T>::KittiesCountOverflow)?;
+
+			// 繁殖kitty需要质押token
+			T::Currency::reserve(&who, T::KittyReserve::get()).map_err(|_| Error::<T>::TokenNotEnough)?;
 
 			// selector for breeding
 			let selector = Self::random_value(&who);
@@ -147,7 +137,7 @@ pub mod pallet {
 			// 繁殖kitty时，需要增加到扩展存储项中
 			AllOwnerKitty::<T>::try_mutate(&who, |kitty_vec| {
 				kitty_vec.try_push(new_kitty.clone())
-			}).map_err(|_| <Error<T>>::ExceedMaxKittyOwned)?;
+			}).map_err(|_| <Error<T>>::KittiesCountOverflow)?;
 
 			Self::deposit_event(Event::KittyCreated(who, kitty_id, new_kitty));
 
@@ -182,7 +172,7 @@ pub mod pallet {
 			// 追加转移的kitty到新拥有者AllOwnerKitty存储项中
 			AllOwnerKitty::<T>::try_mutate(&new_owner, |vec| {
 				vec.try_push(exsit_kitty)
-			}).map_err(|_| <Error<T>>::ExceedMaxKittyOwned)?;
+			}).map_err(|_| <Error<T>>::KittiesCountOverflow)?;
 
 			Self::deposit_event(Event::KittyTransferred(prev_owner,new_owner,kitty_id));
 
